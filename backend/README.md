@@ -13,10 +13,13 @@ FastAPI backend foundation for the ScamCheck opportunity-risk assessment platfor
  - [x] Common Analysis Contracts & Schemas (`AnalysisContext`, `ExtractedEntities`, `RiskSignal`, `Evidence`, `AnalysisResult`)
  - [x] `EntityExtractor` (Part 6: **Fully Implemented & Verified** with deterministic entity extraction)
  - [x] `RuleBasedSignalEngine` (Part 7: **Fully Implemented & Verified** with deterministic rule-based scam signal detection)
+ - [x] `RiskScoringEngine` (Part 8: **Fully Implemented & Verified** with calibrated 0-100 scoring & RiskLevel bands)
+ - [x] `AnalysisService` (Part 9: **Fully Implemented & Verified** with unified end-to-end analysis orchestration)
  - [x] Future ML Component boundary (`app/analysis/ml/`)
- - [x] Future Risk Engine boundary (`app/analysis/risk/`)
  - [x] FastAPI REST API foundation (`/api/analyze/text`, `/api/analyze/file`, `/health`)
- - [x] Automated test suite (`181/181` test cases passing across foundation, text, image, PDF, contracts, extraction, and rule detection pipelines)
+ - [x] Automated test suite (`220/220` test cases passing across foundation, text, image, PDF, contracts, extraction, rules, scoring, and analysis service pipelines)
+
+
 
 
 

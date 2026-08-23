@@ -14,6 +14,7 @@ OpportunityInput -> AnalysisContext -> ExtractedEntities -> RiskSignals -> RiskS
 from backend.app.analysis.extraction import EntityExtractor
 from backend.app.analysis.rules import RuleBasedSignalEngine
 from backend.app.analysis.risk import RiskScoringEngine, get_risk_level
+from backend.app.analysis.analysis_service import AnalysisService
 from backend.app.analysis.models import (
     AnalysisContext,
     AnalysisResult,
@@ -39,6 +40,7 @@ from backend.app.analysis.models import (
 __all__ = [
     "AnalysisContext",
     "AnalysisResult",
+    "AnalysisService",
     "AnalysisStatus",
     "ContactInfoEntity",
     "DateEntity",
@@ -61,6 +63,7 @@ __all__ = [
     "UrlEntity",
     "get_risk_level",
 ]
+
 
 
 

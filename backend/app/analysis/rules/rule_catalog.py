@@ -22,6 +22,8 @@ UPFRONT_PAYMENT_REGEX = re.compile(
     r"application\s+fees?|"
     r"processing\s+fees?|"
     r"security\s+deposits?|"
+    r"security\s+money|"
+    r"caution\s+money|"
     r"training\s+fees?|"
     r"joining\s+fees?|"
     r"onboarding\s+fees?|"
@@ -34,6 +36,9 @@ UPFRONT_PAYMENT_REGEX = re.compile(
     r"certification\s+fees?|"
     r"admission\s+fees?|"
     r"pay\s+(?:₹|\$|€|£|¥|INR|USD|EUR)\s*\d+(?:,\d{3})*|"
+    r"deposit\s+(?:₹|\$|€|£|¥|INR|USD|EUR)\s*\d+(?:,\d{3})*|"
+    r"transfer\s+(?:₹|\$|€|£|¥|INR|USD|EUR)\s*\d+(?:,\d{3})*|"
+    r"send\s+(?:₹|\$|€|£|¥|INR|USD|EUR)\s*\d+(?:,\d{3})*|"
     r"send\s+payment|"
     r"payment\s+required|"
     r"deposit\s+required|"
@@ -45,6 +50,7 @@ UPFRONT_PAYMENT_REGEX = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+
 
 URGENCY_REGEX = re.compile(
     r"\b(?:"

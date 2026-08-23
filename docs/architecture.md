@@ -242,11 +242,14 @@ Whether a student submits a 5-paragraph email, a screenshot of a WhatsApp group 
 - **`pdf_service.py`** *(Implemented & Verified)*: Free, local, pure-Python pypdf text extraction service with safety limits, metadata parsing, and encryption detection.
 
 ### `backend/app/analysis/`
+- **`analysis_service.py`** *(Implemented & Verified)*: Unified analysis orchestrator (`AnalysisService`) executing the complete analytical sequence from `OpportunityInput` to `AnalysisResult`.
 - **`models/`** *(Implemented & Verified)*: Common analysis data contracts (`AnalysisResult`, `RiskSignal`, `Evidence`, `ExtractedEntities`, `AnalysisContext`, `RiskLevel`, `SignalSeverity`, `AnalysisStatus`).
 - **`extraction/`** *(Implemented & Verified)*: Deterministic Entity Extractor (`EntityExtractor`) identifying organizations, job roles, emails, phones, URLs, monetary sums, percentages, dates, locations, and payment details from normalized text.
 - **`rules/`** *(Implemented & Verified)*: Deterministic Rule-Based Scam Signal Engine (`RuleBasedSignalEngine`) detecting upfront fees, urgency, guarantees, no-interview claims, unrealistic compensation, authority claims, and informal contact redirection.
+- **`risk/`** *(Implemented & Verified)*: Deterministic Risk Scoring Engine (`RiskScoringEngine`) calculating calibrated 0–100 risk scores, RiskLevel bands, reasons, and student guidance.
 - **`ml/`** *(Planned)*: Architectural boundary reserved for the future pretrained ML model. Consumes `OpportunityInput.extracted_text`.
-- **`risk/`** *(Planned)*: Architectural boundary reserved for the multi-signal 0–100 risk scoring engine.
+
+
 
 
 ### `backend/app/api/`
@@ -403,7 +406,113 @@ TEXT / IMAGE (OCR) / PDF
 
 ---
 
-## 9. File Safety & Privacy Principles
+## 9. Risk Scoring Engine (Implemented & Verified)
+
+The Risk Scoring Engine (`backend/app/analysis/risk/scoring_engine.py`) synthesizes detected `RiskSignal` objects into a calibrated 0–100 numerical risk score, maps the score into a deterministic `RiskLevel` band, and generates student-friendly safety guidance and explainable reasons.
+
+> **Architectural Boundary Guarantee**:
+> - **Entity Extraction** = *"What factual information exists?"*
+> - **Rule-Based Signal Detection** = *"What suspicious patterns are present?"*
+> - **Risk Scoring Engine** = *"How much do those signals contribute to overall risk?"*
+> - **Future ML Layer** = *"What subtle semantics might rules have missed?"*
+> - **Future URL/Domain Layer** = *"Does external identity verification support or contradict the claim?"*
+>
+> The `RiskScoringEngine` consumes structured `RiskSignal` objects and does not perform raw text regex extraction or external network calls.
+
+### Architectural Pipeline Flow
+
+```
+TEXT / IMAGE (OCR) / PDF
+           ↓
+   OpportunityInput
+           ↓
+    AnalysisContext
+           ↓
+    EntityExtractor
+           ↓
+   ExtractedEntities
+           ↓
+ RuleBasedSignalEngine
+           ↓
+   List[RiskSignal]
+           ↓
+   RiskScoringEngine
+   ├── Centralized Weight Lookup (score_policy.py)
+   ├── Severity Multipliers (LOW: 0.50, MED: 0.75, HIGH: 1.00)
+   ├── Confidence Scaling (0.0 to 1.0)
+   ├── Bounded Compound Adjustment (+10 max)
+   ├── Defensive Signal Deduplication
+   ├── Score Normalization & Clamping (0 to 100)
+   └── RiskLevel Band Assignment
+           ↓
+    AnalysisResult
+   ├── risk_score (0–100)
+   ├── risk_level (LOW, MEDIUM, HIGH, CRITICAL)
+   ├── reasons (explainable bullet points)
+   ├── student_guidance (educational advice)
+   ├── summary (calibrated narrative)
+   └── evidence & extracted_entities
+           ↓
+[FUTURE: ML Semantic & Domain Verification Signal Fusion]
+```
+
+### Risk Level Calibration Bands
+
+| Score Range | Risk Level | Description | Student Safety Action |
+| :--- | :--- | :--- | :--- |
+| **0 – 24** | `RiskLevel.LOW` | Minimal risk indicators detected. | Review opportunity and verify employer before sharing personal info. |
+| **25 – 49** | `RiskLevel.MEDIUM` | Some suspicious indicators detected. | Proceed cautiously; verify employer and contact details independently. |
+| **50 – 74** | `RiskLevel.HIGH` | Multiple significant scam indicators detected. | Do not pay fees or share sensitive documents until verified. |
+| **75 – 100** | `RiskLevel.CRITICAL` | Severe predatory scam patterns detected. | Do not pay or share sensitive info; verify through official website. |
+
+---
+
+## 10. Unified Analysis Orchestration Layer (Implemented & Verified)
+
+The Unified Analysis Orchestration Layer (`backend/app/analysis/analysis_service.py`) coordinates the sequential execution of all deterministic analysis subcomponents through a single programmatic entry point: `AnalysisService.analyze(opportunity_input)`.
+
+### Responsibilities
+- **Input Intake & Validation**: Verifies `OpportunityInput` validity and initializes `AnalysisContext(status=PROCESSING)`.
+- **Entity Extraction**: Invokes `EntityExtractor` to extract structured entities (`ExtractedEntities`) and attach initial evidence.
+- **Rule Detection**: Invokes `RuleBasedSignalEngine` to detect suspicious patterns and collect `List[RiskSignal]`.
+- **Risk Scoring**: Passes context and signals to `RiskScoringEngine` to synthesize the 0–100 risk score and `RiskLevel`.
+- **Traceable Evidence Preservation**: Ensures `Evidence` instances retain their source modalities, offsets, and context throughout the pipeline.
+- **Graceful Error Isolation**: Distinguishes upstream technical processing failures (`ProcessingStatus.FAILED`) from scam risk (guaranteeing `risk_score = 0` and `risk_level = LOW`).
+- **Complete Offline / Privacy Guarantees**: Operates 100% locally with zero network queries, DNS lookups, or persistent database writes.
+
+### Architectural Pipeline Flow
+
+```
+TEXT ───────────────────┐
+                       │
+IMAGE → RapidOCR ──────┤
+                       │
+PDF → pypdf ───────────┘
+                       ↓
+              OpportunityInput
+                       ↓
+              AnalysisContext
+                       ↓
+               AnalysisService
+                       ↓
+              EntityExtractor
+                       ↓
+              ExtractedEntities
+                       ↓
+          RuleBasedSignalEngine
+                       ↓
+                RiskSignals
+                       ↓
+             RiskScoringEngine
+                       ↓
+               AnalysisResult
+                       ↓
+          [Future Intelligence Layers]
+```
+
+---
+
+## 11. File Safety & Privacy Principles
 
 1. **Strict MIME & Extension Whitelisting**:
    - Only permitted image and PDF types are accepted.
@@ -420,4 +529,6 @@ TEXT / IMAGE (OCR) / PDF
 5. **Privacy by Default**:
    - Full student opportunity text is never logged or leaked in error responses.
    - Full user submissions are not logged in plain text.
+
+
 
