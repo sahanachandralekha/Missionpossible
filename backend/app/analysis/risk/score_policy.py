@@ -18,6 +18,7 @@ from backend.app.analysis.models.enums import RiskLevel, SignalSeverity
 # -----------------------------------------------------------------------------
 
 RULE_WEIGHTS: Dict[str, float] = {
+    # Part 7 Rule Signals
     "SIG_UPFRONT_PAYMENT": 30.0,
     "SIG_URGENCY_PRESSURE": 15.0,
     "SIG_GUARANTEED_SELECTION": 25.0,
@@ -30,9 +31,38 @@ RULE_WEIGHTS: Dict[str, float] = {
     "SIG_UNSOLICITED_SELECTION": 15.0,
     "SIG_DOCUMENT_CLAIM": 10.0,
     "SIG_MULTIPLE_HIGH_RISK_PATTERNS": 10.0,  # Bounded compound risk adjustment
+    # Part 10 URL & Domain Signals
+    "SIG_INSECURE_URL": 5.0,
+    "SIG_SHORTENED_URL": 15.0,
+    "SIG_IP_ADDRESS_URL": 15.0,
+    "SIG_URL_USERINFO": 20.0,
+    "SIG_UNUSUAL_URL_PORT": 10.0,
+    "SIG_EXCESSIVE_URL_LENGTH": 5.0,
+    "SIG_SUSPICIOUS_HOSTNAME": 10.0,
+    "SIG_SUSPICIOUS_REDIRECT_PARAMETER": 5.0,
+    "SIG_DOMAIN_ORGANIZATION_MISMATCH": 10.0,
+    # Part 11 Semantic ML/LLM Signals
+    "SIG_SEMANTIC_PAYMENT_PRESSURE": 15.0,
+    "SIG_SEMANTIC_RECRUITMENT_ANOMALY": 10.0,
+    "SIG_SEMANTIC_IMPERSONATION": 15.0,
+    "SIG_SEMANTIC_UNREALISTIC_PROMISE": 15.0,
+    "SIG_SEMANTIC_SOCIAL_ENGINEERING": 15.0,
+    "SIG_SEMANTIC_IDENTITY_REQUEST": 10.0,
+    "SIG_SEMANTIC_FINANCIAL_MANIPULATION": 15.0,
+    "SIG_SEMANTIC_SUSPICIOUS_OPPORTUNITY_CONTEXT": 10.0,
+    # Part 12 Domain Verification Signals
+    "SIG_DOMAIN_UNRESOLVED": 5.0,
+    "SIG_DOMAIN_REDIRECT_ANOMALY": 10.0,
+    "SIG_DOMAIN_ORGANIZATION_INCONSISTENCY": 10.0,
+    "SIG_DOMAIN_TLS_ANOMALY": 5.0,
+    "SIG_DOMAIN_REGISTRATION_ANOMALY": 10.0,
+    "SIG_DOMAIN_INFRASTRUCTURE_UNAVAILABLE": 5.0,
 }
 
 DEFAULT_BASE_WEIGHT: float = 10.0
+
+
+
 
 
 # -----------------------------------------------------------------------------

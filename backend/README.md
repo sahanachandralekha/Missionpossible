@@ -15,9 +15,21 @@ FastAPI backend foundation for the ScamCheck opportunity-risk assessment platfor
  - [x] `RuleBasedSignalEngine` (Part 7: **Fully Implemented & Verified** with deterministic rule-based scam signal detection)
  - [x] `RiskScoringEngine` (Part 8: **Fully Implemented & Verified** with calibrated 0-100 scoring & RiskLevel bands)
  - [x] `AnalysisService` (Part 9: **Fully Implemented & Verified** with unified end-to-end analysis orchestration)
- - [x] Future ML Component boundary (`app/analysis/ml/`)
- - [x] FastAPI REST API foundation (`/api/analyze/text`, `/api/analyze/file`, `/health`)
- - [x] Automated test suite (`220/220` test cases passing across foundation, text, image, PDF, contracts, extraction, rules, scoring, and analysis service pipelines)
+ - [x] `UrlAnalyzer` (Part 10: **Fully Implemented & Verified** with URL & domain structure intelligence)
+ - [x] `SemanticAnalyzer` (Part 11: **Fully Implemented & Verified** with ML/LLM semantic intelligence & provider abstraction)
+ - [x] `DomainVerifier` (Part 12: **Fully Implemented & Verified** with external domain verification, identity intelligence, & SSRF protection)
+ - [x] Production REST API Boundary (Part 13: **Fully Implemented & Verified** with `/api/v1/analyze`, `/api/v1/analyze/file`, `/api/v1/health`, request IDs, and structured errors)
+ - [x] Persistent Analysis History (Part 14: **Fully Implemented & Verified** with `AnalysisRepository`, SQLite durability, `/api/v1/analyses`, and `/api/v1/analyses/{id}`)
+ - [x] React Single-Page Application Frontend (Part 15: **Fully Implemented & Verified** in `/frontend` consuming `/api/v1/` endpoints)
+ - [x] Operational Hardening & Diagnostics (Part 16: **Fully Implemented & Verified** with centralized configuration, structured JSON logging, correlation request IDs, telemetry metrics, security headers, `/ready` probes, and Docker container support)
+ - [x] Automated test suite (`352/352` backend pytest cases passing across foundation, text, image, PDF, contracts, extraction, rules, scoring, analysis service, URL analysis, ML semantic intelligence, domain verification, API v1 boundary, SQLite persistence, and operational hardening)
+
+
+
+
+
+
+
 
 
 

@@ -35,10 +35,10 @@ UPFRONT_PAYMENT_REGEX = re.compile(
     r"exam\s+fees?|"
     r"certification\s+fees?|"
     r"admission\s+fees?|"
-    r"pay\s+(?:₹|\$|€|£|¥|INR|USD|EUR)\s*\d+(?:,\d{3})*|"
-    r"deposit\s+(?:₹|\$|€|£|¥|INR|USD|EUR)\s*\d+(?:,\d{3})*|"
-    r"transfer\s+(?:₹|\$|€|£|¥|INR|USD|EUR)\s*\d+(?:,\d{3})*|"
-    r"send\s+(?:₹|\$|€|£|¥|INR|USD|EUR)\s*\d+(?:,\d{3})*|"
+    r"pay\s+(?:₹|\$|€|£|¥|INR|USD|EUR|Rs\.?|Rupees?)\s*\d+(?:,\d{3})*|"
+    r"deposit\s+(?:₹|\$|€|£|¥|INR|USD|EUR|Rs\.?|Rupees?)\s*\d+(?:,\d{3})*|"
+    r"transfer\s+(?:₹|\$|€|£|¥|INR|USD|EUR|Rs\.?|Rupees?)\s*\d+(?:,\d{3})*|"
+    r"send\s+(?:₹|\$|€|£|¥|INR|USD|EUR|Rs\.?|Rupees?)\s*\d+(?:,\d{3})*|"
     r"send\s+payment|"
     r"payment\s+required|"
     r"deposit\s+required|"
@@ -48,6 +48,7 @@ UPFRONT_PAYMENT_REGEX = re.compile(
     r"pay\s+to\s+receive(?:\s+offer)?|"
     r"upfront\s+fee"
     r")\b",
+
     re.IGNORECASE,
 )
 

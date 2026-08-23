@@ -2,8 +2,8 @@
 
 **ScamCheck** is an intelligent opportunity-risk assessment system engineered to protect students and early-career jobseekers from predatory schemes, fake internships, illegitimate work-from-home tasks, recruitment fraud, and deceptive scholarship/training offers.
 
-> **Current Status**: **Part 9 Complete — Unified Analysis Orchestration Pipeline Fully Implemented & Tested**  
-> Plain text, Image OCR (RapidOCR), PDF extraction (`pypdf`), Common Analysis Contracts, deterministic Entity Extraction, Rule-Based Scam Signal Detection, calibrated Risk Scoring, and Unified Analysis Orchestration (`AnalysisService`) are fully implemented and verified with **220 passing tests**. The single public entry point `AnalysisService.analyze(opportunity_input)` coordinates the complete deterministic sequence from input to explainable `AnalysisResult`. Future ML semantic models and external domain/network checks remain cleanly separated.
+> **Current Status**: **Part 16 Complete — Production Operational Hardening, Observability & Docker Deployment Fully Implemented & Verified**  
+> Plain text, Image OCR (RapidOCR), PDF extraction (`pypdf`), Common Analysis Contracts, Entity Extraction, Rule-Based Scam Signal Detection, URL Structure Intelligence, ML/LLM Semantic Intelligence, Domain Verification, calibrated Risk Scoring, Unified Analysis Orchestration, REST API boundary, SQLite persistence, React frontend, centralized configuration, structured JSON logging, correlation request IDs, telemetry metrics, security headers, health/readiness probes, and Docker container deployment are fully implemented and verified with **379 total passing tests** (352 backend pytest + 27 frontend Vitest).
 
 ---
 
@@ -12,25 +12,47 @@
 ScamCheck does not return naive binary ("SCAM" / "NOT A SCAM") verdicts. Instead, it calculates an **explainable Risk Score (0–100)** with clear, educational evidence points and student guidance.
 
 ```
-USER
-  ↓
-TEXT / IMAGE / PDF
-  ↓
-INPUT PROCESSING (Validation & Normalization / Local RapidOCR / pypdf)
-  ↓
-NORMALIZED OPPORTUNITY (OpportunityInput)
-  ↓
-ANALYSIS CONTEXT (AnalysisContext)
-  ↓
-UNIFIED ANALYSIS SERVICE (AnalysisService)
-  ├── ENTITY EXTRACTION (Factual extraction of Orgs, Contacts, Payments, URLs)
-  ├── RULE-BASED SCAM SIGNAL DETECTION (Upfront fees, Urgency, Guarantees, Informal channels)
-  └── RISK SCORING ENGINE (Calibrated Multi-Signal Aggregation: 0–100 Score & RiskLevel)
-  ↓
-EXPLAINABLE ANALYSIS RESULT (Score, Band, Reasons, Evidence, Safety Guidance)
-  ↓
-ML / NETWORK VERIFICATION (Future Expansion Layers)
+                    USER
+                      ↓
+              React Frontend
+                      ↓
+              FastAPI API
+                      ↓
+        Request / Correlation Middleware
+                      ↓
+             AnalysisService
+                      ↓
+        ┌─────────────┼─────────────┐
+        ↓             ↓             ↓
+   Entity/Rules   Semantic      Domain
+        │          Analysis     Verification
+        └─────────────┼─────────────┘
+                      ↓
+              RiskScoringEngine
+                      ↓
+                AnalysisResult
+                      ↓
+             AnalysisRepository
+                      ↓
+                  SQLite
+                      ↓
+              History / API
+
+             ┌───────────────────┐
+             │ Observability     │
+             │ Logging           │
+             │ Timing/Metrics    │
+             │ Request IDs       │
+             └───────────────────┘
+
+             ┌───────────────────┐
+             │ Configuration     │
+             │ Environment       │
+             │ Runtime Settings  │
+             └───────────────────┘
 ```
+
+
 
 ---
 
@@ -40,9 +62,9 @@ Students encounter offers in diverse formats. ScamCheck standardizes all inputs 
 
 | Input Format | Channels / Artifacts | Processor Status |
 | :--- | :--- | :--- |
-| **Plain Text** | WhatsApp, Telegram, Emails, LinkedIn messages | **Implemented** (`TextProcessor`) |
-| **Images / Photos** | Screenshots of chats, flyers, Instagram DMs | **Implemented** (`ImageProcessor` + `OCRService` RapidOCR) |
-| **PDF Documents** | Formal offer letters, brochures, contracts | **Implemented** (`PdfProcessor` + `PDFService` pypdf) |
+| **Plain Text** | WhatsApp, Telegram, Emails, LinkedIn messages | **Implemented** (`TextProcessor` & `POST /api/v1/analyze`) |
+| **Images / Photos** | Screenshots of chats, flyers, Instagram DMs | **Implemented** (`ImageProcessor` + RapidOCR & `POST /api/v1/analyze/file`) |
+| **PDF Documents** | Formal offer letters, brochures, contracts | **Implemented** (`PdfProcessor` + pypdf & `POST /api/v1/analyze/file`) |
 
 ### The Normalized `OpportunityInput` Model
 All input formats are processed into an immutable common representation:
@@ -66,9 +88,19 @@ Scam-Check/
 │   │   ├── main.py                  # FastAPI entrypoint, health checks, & CORS
 │   │   ├── api/
 │   │   │   ├── __init__.py
+│   │   │   ├── router.py            # API router aggregator
+│   │   │   ├── schemas.py           # AnalyzeTextRequest, AnalysisApiResponse, ApiHealthResponse
+│   │   │   ├── v1/
+│   │   │   │   ├── __init__.py
+│   │   │   │   └── routes.py        # /api/v1/analyze, /api/v1/analyze/file, /api/v1/analyses, /api/v1/health
 │   │   │   └── routes/
 │   │   │       ├── __init__.py
-│   │   │       └── analysis.py      # /api/analyze/text and /api/analyze/file endpoints
+│   │   │       └── analysis.py      # Legacy /api/analyze endpoints (backward-compatible)
+│   │   ├── persistence/
+│   │   │   ├── __init__.py
+│   │   │   ├── database.py          # SQLite database connection & schema manager
+│   │   │   ├── models.py            # AnalysisRecord, AnalysisSummaryItem, AnalysisListResponse
+│   │   │   └── repository.py        # AnalysisRepository & SQLiteAnalysisRepository
 │   │   ├── schemas/
 │   │   │   ├── __init__.py
 │   │   │   └── opportunity.py      # OpportunityInput Pydantic models & enums
@@ -89,9 +121,10 @@ Scam-Check/
 │   │       ├── models/              # AnalysisResult, RiskSignal, Evidence, ExtractedEntities
 │   │       ├── extraction/          # Deterministic EntityExtractor (Implemented)
 │   │       ├── rules/               # RuleBasedSignalEngine (Implemented)
-│   │       ├── risk/                # RiskScoringEngine & Score Policy (Implemented)
-│   │       └── ml/
-│   │           └── __init__.py      # Location for future pretrained ML model
+│   │       ├── url/                 # UrlAnalyzer & URL Rules (Implemented)
+│   │       ├── ml/                  # SemanticAnalyzer & Provider Abstraction (Implemented)
+│   │       ├── domain/              # DomainVerifier & Network Provider (Implemented)
+│   │       └── risk/                # RiskScoringEngine & Score Policy (Implemented)
 │   ├── tests/
 │   │   ├── __init__.py
 │   │   ├── test_foundation.py       # Architecture contract tests (22 tests)
@@ -102,12 +135,19 @@ Scam-Check/
 │   │   ├── test_entity_extraction.py # Entity extraction tests (30 tests)
 │   │   ├── test_rule_detection.py   # Rule detection tests (34 tests)
 │   │   ├── test_risk_scoring.py     # Risk scoring tests (21 tests)
-│   │   └── test_analysis_service.py # Analysis orchestration tests (18 tests)
+│   │   ├── test_analysis_service.py # Analysis orchestration tests (18 tests)
+│   │   ├── test_url_analysis.py     # URL & domain structure tests (27 tests)
+│   │   ├── test_semantic_analysis.py # ML/LLM semantic tests (25 tests)
+│   │   ├── test_domain_verification.py # Domain verification tests (24 tests)
+│   │   ├── test_api_v1.py           # Production API boundary tests (25 tests)
+│   │   └── test_persistence.py      # Database persistence & history tests (14 tests)
 │   ├── requirements.txt             # Core dependencies (FastAPI, Pydantic, RapidOCR, pypdf)
 │   └── README.md                    # Backend documentation
 ├── docs/
 │   └── architecture.md              # Complete system design & specification
 ├── .gitignore
+
+```
 └── README.md
 ```
 

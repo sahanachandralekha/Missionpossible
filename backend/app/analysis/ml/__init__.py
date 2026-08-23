@@ -1,13 +1,35 @@
-"""Machine Learning Analysis Component.
+"""ML & LLM Semantic Intelligence Module for ScamCheck.
 
-STATUS: ARCHITECTURAL PLACEHOLDER (PLANNED)
+STATUS: FULLY IMPLEMENTED (Part 11)
 
-This module represents the future location for loading and evaluating the pretrained
-ML model.
-
-Design Principle:
-The future ML component receives `OpportunityInput.extracted_text` rather than raw PDFs
-or images. All raw formats must be normalized before reaching this layer.
-
-Do NOT initialize models, weights, or datasets in this foundation task.
+Exports:
+- SemanticAnalyzer (Main semantic analysis orchestrator)
+- SemanticModelProvider (Abstract provider interface)
+- DeterministicSemanticProvider (Safe 100% offline fallback provider)
+- MockSemanticProvider (Testing & diagnostic provider)
+- SemanticModelOutput (Structured provider output schema)
+- SemanticSignalItem (Structured provider signal item)
+- get_semantic_provider (Provider factory)
 """
+
+from backend.app.analysis.ml.base import SemanticModelProvider
+from backend.app.analysis.ml.provider import (
+    DeterministicSemanticProvider,
+    MockSemanticProvider,
+    get_semantic_provider,
+)
+from backend.app.analysis.ml.schemas import (
+    SemanticModelOutput,
+    SemanticSignalItem,
+)
+from backend.app.analysis.ml.semantic_analyzer import SemanticAnalyzer
+
+__all__ = [
+    "DeterministicSemanticProvider",
+    "MockSemanticProvider",
+    "SemanticAnalyzer",
+    "SemanticModelOutput",
+    "SemanticModelProvider",
+    "SemanticSignalItem",
+    "get_semantic_provider",
+]
