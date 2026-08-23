@@ -2,8 +2,8 @@
 
 **ScamCheck** is an intelligent opportunity-risk assessment system engineered to protect students and early-career jobseekers from predatory schemes, fake internships, illegitimate work-from-home tasks, recruitment fraud, and deceptive scholarship/training offers.
 
-> **Current Status**: **Part 2 Complete — Text Input Pipeline Fully Implemented & Tested**  
-> Text ingestion, schema validation, conservative normalization, and evidence preservation are complete and verified with 51 passing tests. Downstream ML models, OCR vision engines, PDF extractors, and risk scoring algorithms remain clearly separated for upcoming phases.
+> **Current Status**: **Part 7 Complete — Rule-Based Scam Signal Detection Engine Fully Implemented & Tested**  
+> Plain text, Image OCR (RapidOCR), PDF extraction (`pypdf`), Common Analysis Contracts, deterministic Entity Extraction, and deterministic Rule-Based Scam Signal Detection are fully implemented and verified with **181 passing tests**. The rule engine detects suspicious indicators (upfront fees, pressure urgency, guarantees, no-interview hiring, unrealistic income, authority claims, informal contact channels) with traceable evidence while keeping `score_contribution = 0.0` (risk scoring engine explicitly reserved for upcoming phases).
 
 ---
 
@@ -16,9 +16,13 @@ USER
   ↓
 TEXT / IMAGE / PDF
   ↓
-INPUT PROCESSING (Validation & Normalization)
+INPUT PROCESSING (Validation & Normalization / Local RapidOCR / pypdf)
   ↓
 NORMALIZED OPPORTUNITY (OpportunityInput)
+  ↓
+ENTITY EXTRACTION (Factual extraction of Orgs, Contacts, Payments, URLs)
+  ↓
+RULE-BASED SCAM SIGNAL DETECTION (Upfront fees, Urgency, Guarantees, Informal channels)
   ↓
 ML + OTHER ANALYSIS (NLP Classifier, Heuristics, Pattern Cues)
   ↓
@@ -38,17 +42,17 @@ Students encounter offers in diverse formats. ScamCheck standardizes all inputs 
 | Input Format | Channels / Artifacts | Processor Status |
 | :--- | :--- | :--- |
 | **Plain Text** | WhatsApp, Telegram, Emails, LinkedIn messages | **Implemented** (`TextProcessor`) |
-| **Images / Photos** | Screenshots of chats, flyers, Instagram DMs | **Foundation Implemented** (`ImageProcessor`, OCR planned) |
-| **PDF Documents** | Formal offer letters, brochures, contracts | **Foundation Implemented** (`PdfProcessor`, Parsing planned) |
+| **Images / Photos** | Screenshots of chats, flyers, Instagram DMs | **Implemented** (`ImageProcessor` + `OCRService` RapidOCR) |
+| **PDF Documents** | Formal offer letters, brochures, contracts | **Implemented** (`PdfProcessor` + `PDFService` pypdf) |
 
 ### The Normalized `OpportunityInput` Model
 All input formats are processed into an immutable common representation:
 - `source_type`: `"text"`, `"image"`, or `"pdf"`
 - `original_filename`: Uploaded filename (if applicable)
 - `mime_type`: Content MIME classification
-- `raw_text`: Pre-normalized text or raw OCR dump
+- `raw_text`: Pre-normalized text, raw OCR dump, or raw assembled PDF text
 - `extracted_text`: Sanitized, normalized text string passed to ML & Risk Engine
-- `metadata`: Size, word count, platform hints, confidence
+- `metadata`: Size, word count, page count, OCR confidence, platform hints
 - `processing_status`: Current lifecycle state (`"pending"`, `"extracted"`, `"normalized"`, `"failed"`)
 
 ---
@@ -71,23 +75,34 @@ Scam-Check/
 │   │   │   └── opportunity.py      # OpportunityInput Pydantic models & enums
 │   │   ├── services/
 │   │   │   ├── __init__.py
-│   │   │   └── input_service.py     # Input intake & processor orchestrator
+│   │   │   ├── input_service.py     # Input intake & processor orchestrator
+│   │   │   ├── ocr_service.py       # RapidOCR offline local inference service
+│   │   │   └── pdf_service.py       # pypdf local embedded text extraction service
 │   │   ├── processors/
 │   │   │   ├── __init__.py
 │   │   │   ├── base.py              # Base processor abstract class
 │   │   │   ├── text_processor.py    # Text validation & normalization (Implemented)
-│   │   │   ├── image_processor.py   # Image validation & OCR stub (Planned)
-│   │   │   └── pdf_processor.py     # PDF validation & Extraction stub (Planned)
+│   │   │   ├── image_processor.py   # Image validation & RapidOCR (Implemented)
+│   │   │   └── pdf_processor.py     # PDF validation & pypdf extraction (Implemented)
 │   │   └── analysis/
 │   │       ├── __init__.py
+│   │       ├── models/              # AnalysisResult, RiskSignal, Evidence, ExtractedEntities
+│   │       ├── extraction/          # Deterministic EntityExtractor (Implemented)
+│   │       ├── rules/               # RuleBasedSignalEngine (Implemented)
 │   │       ├── ml/
 │   │       │   └── __init__.py      # Location for future pretrained ML model
 │   │       └── risk/
 │   │           └── __init__.py      # Location for future 0-100 risk engine
 │   ├── tests/
 │   │   ├── __init__.py
-│   │   └── test_foundation.py       # Pytest suite verifying foundation & contracts
-│   ├── requirements.txt             # Core dependencies (FastAPI, Pydantic, Pytest, etc.)
+│   │   ├── test_foundation.py       # Architecture contract tests (22 tests)
+│   │   ├── test_text_pipeline.py    # Text normalization & evidence tests (29 tests)
+│   │   ├── test_image_pipeline.py   # Image & OCR tests (23 tests)
+│   │   ├── test_pdf_pipeline.py     # PDF extraction & page tests (23 tests)
+│   │   ├── test_analysis_contracts.py # Analysis schema tests (20 tests)
+│   │   ├── test_entity_extraction.py # Entity extraction tests (30 tests)
+│   │   └── test_rule_detection.py   # Rule detection tests (34 tests)
+│   ├── requirements.txt             # Core dependencies (FastAPI, Pydantic, RapidOCR, pypdf)
 │   └── README.md                    # Backend documentation
 ├── docs/
 │   └── architecture.md              # Complete system design & specification

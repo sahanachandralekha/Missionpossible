@@ -169,13 +169,24 @@ def test_text_processor_validation_empty():
         processor.process(content="   \n\t   ")
 
 
+def _create_test_image_bytes(text: str = "Test Offer") -> bytes:
+    """Helper to generate a valid in-memory PNG image."""
+    from PIL import Image, ImageDraw
+    img = Image.new("RGB", (300, 100), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    draw.text((20, 40), text, fill=(0, 0, 0))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def test_image_processor_validation_and_structure():
     """Verify ImageProcessor validates file extension, mime types, and returns valid OpportunityInput."""
     processor = ImageProcessor()
-    dummy_bytes = b"\x89PNG\r\n\x1a\n" + b"dummy image payload content"
+    valid_bytes = _create_test_image_bytes("Software Internship $500")
 
     result = processor.process(
-        content=dummy_bytes,
+        content=valid_bytes,
         filename="screenshot.png",
         mime_type="image/png",
         metadata={"user_device": "mobile"},
@@ -184,9 +195,11 @@ def test_image_processor_validation_and_structure():
     assert result.source_type == SourceType.IMAGE
     assert result.original_filename == "screenshot.png"
     assert result.mime_type == "image/png"
-    assert result.metadata["byte_size"] == len(dummy_bytes)
-    assert result.metadata["ocr_status"] == "planned_placeholder"
-    assert "PLANNED_OCR_EXTRACTION" in result.extracted_text
+    assert result.metadata["byte_size"] == len(valid_bytes)
+    assert result.metadata["ocr_engine"] == "RapidOCR-ONNX"
+    assert result.metadata["ocr_status"] == "success"
+    assert result.processing_status == ProcessingStatus.NORMALIZED
+    assert len(result.extracted_text) > 0
 
 
 def test_image_processor_rejects_invalid_extension():
@@ -204,13 +217,23 @@ def test_image_processor_rejects_empty_file():
         processor.process(content=b"", filename="empty.jpg", mime_type="image/jpeg")
 
 
+def _create_test_pdf_bytes(text: str = "Test Internship Offer") -> bytes:
+    """Helper to generate a valid in-memory single-page PDF with embedded text."""
+    from reportlab.pdfgen import canvas
+    buf = io.BytesIO()
+    c = canvas.Canvas(buf)
+    c.drawString(100, 750, text)
+    c.save()
+    return buf.getvalue()
+
+
 def test_pdf_processor_validation_and_structure():
     """Verify PdfProcessor validates PDF extension, mime types, and returns valid OpportunityInput."""
     processor = PdfProcessor()
-    dummy_pdf_bytes = b"%PDF-1.4 dummy pdf header and payload"
+    valid_pdf_bytes = _create_test_pdf_bytes("Internship Offer Letter $1000")
 
     result = processor.process(
-        content=dummy_pdf_bytes,
+        content=valid_pdf_bytes,
         filename="internship_offer.pdf",
         mime_type="application/pdf",
     )
@@ -218,9 +241,12 @@ def test_pdf_processor_validation_and_structure():
     assert result.source_type == SourceType.PDF
     assert result.original_filename == "internship_offer.pdf"
     assert result.mime_type == "application/pdf"
-    assert result.metadata["byte_size"] == len(dummy_pdf_bytes)
-    assert result.metadata["pdf_extraction_status"] == "planned_placeholder"
-    assert "PLANNED_PDF_EXTRACTION" in result.extracted_text
+    assert result.metadata["byte_size"] == len(valid_pdf_bytes)
+    assert result.metadata["pdf_extraction_engine"] == "pypdf"
+    assert result.metadata["pdf_status"] == "success"
+    assert result.metadata["pdf_page_count"] == 1
+    assert result.processing_status == ProcessingStatus.NORMALIZED
+    assert "Internship Offer Letter" in result.extracted_text
 
 
 def test_pdf_processor_rejects_invalid_mime():
@@ -255,17 +281,19 @@ def test_input_service_file_detection_and_routing():
     service = InputService()
 
     # Route Image
+    img_bytes = _create_test_image_bytes("Marketing Opportunity")
     img_opp = service.process_file(
-        content=b"dummy image bytes",
-        filename="flyer.jpg",
-        mime_type="image/jpeg",
+        content=img_bytes,
+        filename="flyer.png",
+        mime_type="image/png",
     )
     assert img_opp.source_type == SourceType.IMAGE
-    assert img_opp.original_filename == "flyer.jpg"
+    assert img_opp.original_filename == "flyer.png"
 
     # Route PDF
+    pdf_bytes = _create_test_pdf_bytes("Formal Internship Agreement")
     pdf_opp = service.process_file(
-        content=b"%PDF-1.5 test",
+        content=pdf_bytes,
         filename="agreement.pdf",
         mime_type="application/pdf",
     )
@@ -312,7 +340,7 @@ def test_api_analyze_text_endpoint_validation_error(client: TestClient):
 
 def test_api_analyze_file_endpoint_image(client: TestClient):
     """Verify POST /api/analyze/file processes uploaded image."""
-    file_content = b"\x89PNG\r\n\x1a\nfakeimagecontent"
+    file_content = _create_test_image_bytes("Software Internship Offer")
     files = {"file": ("screenshot.png", io.BytesIO(file_content), "image/png")}
     response = client.post("/api/analyze/file", files=files)
 
@@ -325,7 +353,7 @@ def test_api_analyze_file_endpoint_image(client: TestClient):
 
 def test_api_analyze_file_endpoint_pdf(client: TestClient):
     """Verify POST /api/analyze/file processes uploaded PDF."""
-    file_content = b"%PDF-1.4 test document stream"
+    file_content = _create_test_pdf_bytes("Official Job Offer Letter")
     files = {"file": ("job_offer.pdf", io.BytesIO(file_content), "application/pdf")}
     response = client.post("/api/analyze/file", files=files)
 

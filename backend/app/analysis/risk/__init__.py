@@ -1,17 +1,27 @@
-"""Risk Engine Component.
+"""ScamCheck Risk Scoring Package.
 
-STATUS: ARCHITECTURAL PLACEHOLDER (PLANNED)
+STATUS: FULLY IMPLEMENTED (Part 8)
 
-This module represents the future location for the explainable 0-100 risk scoring engine.
-
-Future Behavior:
-1. Synthesizes multiple validated signals:
-   - ML model confidence / probability
-   - Suspicious pattern indicators (e.g. upfront fee, fake domain, urgency)
-   - Channel & contact patterns (e.g. WhatsApp/Telegram direct redirect)
-   - Extracted evidence markers
-2. Calculates calibrated Risk Score: 0 - 100
-3. Generates clear, student-friendly explanations of why the score was assigned.
-
-Do NOT invent fake scoring weights or mock classifications in this foundation task.
+Exports:
+- RiskScoringEngine: Calibrated 0-100 risk scoring synthesis
+- get_risk_level: Risk score to RiskLevel band mapper
+- RULE_WEIGHTS, SEVERITY_MULTIPLIERS, STUDENT_GUIDANCE_MAP, SUMMARY_MAP
 """
+
+from backend.app.analysis.risk.scoring_engine import RiskScoringEngine
+from backend.app.analysis.risk.score_policy import (
+    RULE_WEIGHTS,
+    SEVERITY_MULTIPLIERS,
+    STUDENT_GUIDANCE_MAP,
+    SUMMARY_MAP,
+    get_risk_level,
+)
+
+__all__ = [
+    "RiskScoringEngine",
+    "RULE_WEIGHTS",
+    "SEVERITY_MULTIPLIERS",
+    "STUDENT_GUIDANCE_MAP",
+    "SUMMARY_MAP",
+    "get_risk_level",
+]

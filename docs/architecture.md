@@ -2,8 +2,10 @@
 
 > **Stage Status**: 
 > - **Part 1 (Foundation)**: Complete & Verified.
-> - **Part 2 (Text Pipeline)**: **COMPLETE & FULLY IMPLEMENTED**.
-> - **Planned Subsequent Phases**: Image OCR, PDF extraction, Pretrained ML integration, Heuristic rules, and 0–100 Risk Engine.
+> - **Part 2 (Text Pipeline)**: Complete & Verified.
+> - **Part 3 (Image & OCR Pipeline)**: Complete & Verified.
+> - **Part 4 (PDF Extraction Pipeline)**: **COMPLETE & FULLY IMPLEMENTED**.
+> - **Planned Subsequent Phases**: Pretrained ML model integration, Heuristic rules, and 0–100 Risk Engine.
 
 ---
 
@@ -20,11 +22,27 @@ Traditional spam detectors produce naive binary verdicts ("SCAM" vs. "NOT A SCAM
 
 ---
 
-## 2. Multi-Format Input Support & Text Pipeline
+## 2. Ingestion Pipelines & Modality Convergence
 
-Students encounter opportunities across numerous communication channels (WhatsApp, LinkedIn, Telegram, Instagram DMs, email, campus bulletin boards, PDF offer letters, web pages). 
+Students encounter opportunities across numerous communication channels (WhatsApp, LinkedIn, Telegram, Instagram DMs, email, campus bulletin boards, PDF offer letters, web pages).
 
-### Text Input Pipeline Flow (Part 2: Implemented)
+### The Ingestion Convergence Guarantee
+
+```
+TEXT ──────────────────────┐
+                           │
+IMAGE → OCR ───────────────┤
+                           │
+PDF → TEXT EXTRACTION ─────┘
+                           ↓
+                   TextProcessor
+                           ↓
+                  OpportunityInput
+                           ↓
+                   FUTURE ANALYSIS
+```
+
+### A. Text Input Pipeline Flow (Implemented)
 
 ```
 USER TEXT SUBMISSION
@@ -42,14 +60,66 @@ TEXT PROCESSOR (Conservative Normalization)
   - Strip accidental outer bounding whitespace
   - 100% PRESERVE: URLs, Emails, Phone Numbers, Currencies, Percentages, Dates, Casing, Punctuation
          ↓
-NORMALIZED OpportunityInput
-  - source_type = "text"
-  - raw_text = Pristine original user submission
-  - extracted_text = Normalized text ready for analysis
-  - metadata = {char_count, word_count, line_count, ...}
-  - processing_status = "normalized"
+NORMALIZED OpportunityInput (source_type = "text")
+```
+
+### B. Image & Screenshot OCR Pipeline Flow (Implemented)
+
+```
+USER IMAGE / SCREENSHOT UPLOAD (.png, .jpg, .jpeg, .webp)
          ↓
-[FUTURE ANALYSIS LAYER] (ML Classifier & Risk Scoring Engine)
+SECURITY & FORMAT VALIDATION (MIME, size ≤ 10 MB, non-empty)
+         ↓
+IMAGE DECODE & PREPROCESSING (Pillow: in-memory stream, RGBA alpha composite, EXIF rotation)
+         ↓
+LOCAL OCR INFERENCE (RapidOCR with ONNX Runtime on CPU)
+         ↓
+TEXT NORMALIZATION (Via Existing TextProcessor)
+         ↓
+NORMALIZED OpportunityInput (source_type = "image")
+```
+
+### C. PDF Document Text Extraction Flow (Part 4: Implemented)
+
+```
+USER PDF DOCUMENT UPLOAD (.pdf)
+         ↓
+SECURITY & FORMAT VALIDATION
+  - Whitelist check: .pdf extension & application/pdf MIME
+  - Header inspection: %PDF- magic signature verification
+  - Safety limits: File size ≤ 15 MB, Page count ≤ 100 pages
+  - Non-empty byte verification
+         ↓
+IN-MEMORY INSPECTION & DECODING (pypdf via PDFService)
+  - Memory-only stream processing (ephemeral, zero disk writes)
+  - Encryption check: Detects password-protected PDFs without bypassing
+  - Metadata inspection: Extracts document title, author, creation date (contextual only)
+         ↓
+PAGE-BY-PAGE EXTRACTION & BOUNDARY ASSEMBLY
+  - Iterates over pages extracting embedded digital text layer
+  - Assembles multi-page documents with deterministic boundary markers:
+      "--- Page 1 ---\n<text>\n\n--- Page 2 ---\n<text>"
+  - Handles blank / image-only PDFs with explicit 'no_extractable_text' status
+         ↓
+TEXT NORMALIZATION (Via Existing TextProcessor)
+  - Passes extracted raw text directly through TextProcessor
+  - Retains all formatting, URLs, emails, currencies, and dates
+         ↓
+NORMALIZED OpportunityInput
+  - source_type = "pdf"
+  - raw_text = Raw assembled PDF text
+  - extracted_text = Normalized text
+  - metadata = {
+      "pdf_page_count": 3,
+      "pdf_extraction_engine": "pypdf",
+      "pdf_status": "success",
+      "pdf_title": "...",
+      "pdf_author": "...",
+      "char_count": 1420,
+      "word_count": 215,
+      ...
+    }
+  - processing_status = "normalized" (or "failed" with explicit reason)
 ```
 
 ```
@@ -61,7 +131,7 @@ NORMALIZED OpportunityInput
          ▼                         ▼                         ▼
 ┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
 │  TextProcessor  │       │ ImageProcessor  │       │  PdfProcessor   │
-│  [Implemented]  │       │  [Planned OCR]  │       │ [Planned Parse] │
+│  [Implemented]  │       │ [RapidOCR Live] │       │  [pypdf Live]   │
 └────────┬────────┘       └────────┬────────┘       └────────┬────────┘
          │                         │                         │
          └───────────────────┬─────┴─────────────────────────┘
@@ -162,34 +232,192 @@ Whether a student submits a 5-paragraph email, a screenshot of a WhatsApp group 
 
 ### `backend/app/processors/`
 - **`base.py`**: Declares `BaseInputProcessor`, the contract requiring `.validate()` and `.process()`.
-- **`text_processor.py`** *(Implemented)*: Validates string lengths, strips null bytes, standardizes line breaks, collapses excess spacing, and counts characters/words.
-- **`image_processor.py`** *(Foundation Implemented, OCR Planned)*: Validates image extensions (`.png`, `.jpg`, `.jpeg`, `.webp`), MIME types, and size limits (10 MB). Stubs interface for future OCR engine integration.
-- **`pdf_processor.py`** *(Foundation Implemented, Extraction Planned)*: Validates PDF extensions (`.pdf`), MIME types, and size limits (15 MB). Stubs interface for digital text layer extraction and scanned OCR fallback.
+- **`text_processor.py`** *(Implemented & Verified)*: Validates string lengths, strips non-printable control bytes, standardizes line breaks, collapses excess blank lines, and guarantees 100% evidence preservation.
+- **`image_processor.py`** *(Implemented & Verified)*: Validates image extensions (`.png`, `.jpg`, `.jpeg`, `.webp`), MIME types, and size limits (10 MB). Delegates to `OCRService` for local RapidOCR inference and feeds text to `TextProcessor`.
+- **`pdf_processor.py`** *(Implemented & Verified)*: Validates PDF extensions (`.pdf`), MIME types, and size limits (15 MB). Delegates to `PDFService` for `pypdf` embedded text extraction, page assembly, and routes text to `TextProcessor`.
 
 ### `backend/app/services/`
-- **`input_service.py`** *(Implemented)*: The intake orchestrator. Detects incoming source types, routes payloads to the corresponding processor, and returns the normalized `OpportunityInput`. Does **not** contain ML or risk scoring logic.
+- **`input_service.py`** *(Implemented & Verified)*: The intake orchestrator. Detects incoming source types, routes payloads to the corresponding processor, and returns the normalized `OpportunityInput`. Does **not** contain ML or risk scoring logic.
+- **`ocr_service.py`** *(Implemented & Verified)*: Free, local, offline RapidOCR service with Pillow preprocessing and EXIF auto-rotation.
+- **`pdf_service.py`** *(Implemented & Verified)*: Free, local, pure-Python pypdf text extraction service with safety limits, metadata parsing, and encryption detection.
 
 ### `backend/app/analysis/`
+- **`models/`** *(Implemented & Verified)*: Common analysis data contracts (`AnalysisResult`, `RiskSignal`, `Evidence`, `ExtractedEntities`, `AnalysisContext`, `RiskLevel`, `SignalSeverity`, `AnalysisStatus`).
+- **`extraction/`** *(Implemented & Verified)*: Deterministic Entity Extractor (`EntityExtractor`) identifying organizations, job roles, emails, phones, URLs, monetary sums, percentages, dates, locations, and payment details from normalized text.
+- **`rules/`** *(Implemented & Verified)*: Deterministic Rule-Based Scam Signal Engine (`RuleBasedSignalEngine`) detecting upfront fees, urgency, guarantees, no-interview claims, unrealistic compensation, authority claims, and informal contact redirection.
 - **`ml/`** *(Planned)*: Architectural boundary reserved for the future pretrained ML model. Consumes `OpportunityInput.extracted_text`.
 - **`risk/`** *(Planned)*: Architectural boundary reserved for the multi-signal 0–100 risk scoring engine.
+
 
 ### `backend/app/api/`
 - **`routes/analysis.py`** *(Implemented)*: REST API endpoints (`/api/analyze/text`, `/api/analyze/file`).
 - **`main.py`** *(Implemented)*: FastAPI app entrypoint, CORS configuration, `/` and `/health` endpoints.
 
+
 ---
 
-## 6. File Safety & Privacy Principles
+## 6. Analysis Data Contract
+
+The ScamCheck analysis architecture is governed by a unified data contract connecting raw ingestion to the final explainable risk assessment.
+
+> **Important Boundary Note**: The analysis contracts define the schemas, enums, and data relationships. Scam detection rules, ML model evaluation, heuristic keyword extraction, and risk score calculation are explicitly reserved for subsequent phases.
+
+### Analysis Pipeline Flow
+
+```
+INPUT (Text / Image / PDF)
+         ↓
+OpportunityInput (Normalized Ingestion Representation)
+         ↓
+AnalysisContext (Standardized Execution Envelope)
+         ↓
+ExtractedEntities (Organizations, Contacts, Payments, URLs, Dates)
+         ↓
+RiskSignals (Individual Multi-Source Risk Indicators + Evidence)
+         ↓
+RiskScoring (Future Calibrated 0–100 Scoring Synthesis)
+         ↓
+AnalysisResult (Explainable Result, Risk Level Band, Reasons, Guidance)
+```
+
+### Key Contract Specifications
+
+1. **Calibrated Risk Levels (`RiskLevel`)**:
+   - `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
+   - *Never* uses binary `SCAM` / `NOT_SCAM` labels.
+2. **Signal Severity (`SignalSeverity`)**:
+   - `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
+   - Decoupled from the final opportunity risk score; individual indicators contribute weighted signal rather than hard-failing an opportunity.
+3. **Traceable Evidence (`Evidence`)**:
+   - Stores exact extracted values (`₹999`, `immediately`), source modality, line/page location, surrounding context, and normalized representations.
+4. **Structured Entities (`ExtractedEntities`)**:
+   - Type-safe schemas for extracted organizations, job titles, emails, phone numbers, URLs, monetary amounts, percentages, dates, locations, payment details, and contact aggregations.
+5. **Execution Context (`AnalysisContext`)**:
+   - Encapsulates `OpportunityInput`, `ExtractedEntities`, `evidence_pool`, and diagnostic metadata passed between analytical components.
+6. **Final Output (`AnalysisResult`)**:
+   - Unifies `risk_score` (0–100), `risk_level`, `signals`, `reasons`, `summary`, and `extracted_entities`.
+   - Distinguishes extraction/processing failures (`AnalysisStatus.FAILED`) from fraud signals (ensuring technical OCR/PDF errors are never conflated with high scam risk).
+
+---
+
+## 7. Entity Extraction Layer (Implemented & Verified)
+
+The Entity Extraction layer (`backend/app/analysis/extraction/entity_extractor.py`) deterministically identifies and extracts factual elements from normalized opportunity text (`OpportunityInput.extracted_text` encapsulated in `AnalysisContext`).
+
+> **Architectural Boundary Guarantee**:
+> - **Entity Extraction = "What factual information is present?"**
+> - **Risk Signal Engine = "Why might that information indicate predatory risk?"**
+>
+> The `EntityExtractor` **never** calculates risk scores, assigns risk levels, or classifies opportunities. Extracted entities are factual data objects passed to the future Rule Engine and ML Classifier.
+
+### Architectural Flow
+
+```
+TEXT ──────────────────────┐
+                           │
+IMAGE → OCR ───────────────┤
+                           │
+PDF → TEXT EXTRACTION ─────┘
+                           ↓
+                   OpportunityInput
+                           ↓
+                    AnalysisContext
+                           ↓
+                    EntityExtractor
+                           ↓
+                   ExtractedEntities
+                     + Evidence List
+                           ↓
+               FUTURE Risk Signal Engine
+```
+
+### Supported Entity Extractions
+1. **Organizations (`OrganizationEntity`)**: Identifies companies and institutions via business entity suffixes (`Ltd`, `Pvt Ltd`, `LLC`, `Inc`, `Technologies`, `Solutions`, `Systems`, `Software`, `Labs`, `Services`).
+2. **Job Titles (`JobTitleEntity`)**: Identifies technical, non-technical, and internship roles (`Frontend Developer`, `Data Analyst`, `Content Writer`, `Research Intern`, `Remote Internship`).
+3. **Emails (`EmailEntity`)**: Standard email address extraction with automated free-provider classification (`gmail.com`, `yahoo.com`, `hotmail.com`).
+4. **Phone Numbers (`PhoneEntity`)**: Extracts national and international phone numbers (`+91 9876543210`, `(800) 555-0199`) while filtering out standalone dates, years, or monetary numbers.
+5. **URLs (`UrlEntity`)**: Extracts complete web hyperlinks with domain, path, and link shortener detection (`bit.ly`, `tinyurl.com`).
+6. **Monetary Amounts (`MonetaryAmountEntity`)**: Parses international currency symbols (`₹`, `$`, `€`, `£`, `¥`) and ISO codes (`INR`, `USD`, `EUR`), parses numeric values, and determines context purpose (`fee`, `deposit`, `salary`, `stipend`).
+7. **Percentages (`PercentageEntity`)**: Parses numeric percentages and contextual modifiers (`40% commission`, `100% guarantee`).
+8. **Dates (`DateEntity`)**: Extracts deadlines and commencement dates across numerical and textual date formats (`25/10/2026`, `October 25, 2026`).
+9. **Locations (`LocationEntity`)**: Matches prominent urban centers and remote work designations (`Remote`, `Work From Home`, `WFH`).
+10. **Payment Details (`PaymentDetailEntity`)**: Extracts explicit payment requests, upfront fees (`registration fee`, `security deposit`, `training fee`), and UPI handles (`hr@okaxis`, `paytm`).
+11. **Contact Information (`ContactInfoEntity`)**: Aggregates verified communication avenues across emails, phones, URLs, and social handles (Telegram, WhatsApp, Instagram).
+
+---
+
+## 8. Rule-Based Scam Signal Detection Layer (Implemented & Verified)
+
+The Rule-Based Signal Detection layer (`backend/app/analysis/rules/rule_engine.py`) deterministically detects predatory and fraudulent opportunity patterns from normalized text and structured entity facts (`ExtractedEntities`).
+
+> **Architectural Boundary Guarantee**:
+> - **Entity Extraction** = *"What factual information exists?"*
+> - **Rule-Based Signal Engine** = *"What suspicious patterns are present?"*
+> - **Risk Scoring Engine** = *"How much should those signals contribute to the overall 0–100 risk score?"* (Part 8)
+>
+> The `RuleBasedSignalEngine` **never** calculates a final 0–100 risk score, assigns a `RiskLevel`, or classifies an opportunity as `SCAM`/`NOT_SCAM`. All generated signals carry neutral `score_contribution = 0.0`.
+
+### Architectural Pipeline Flow
+
+```
+TEXT / IMAGE (OCR) / PDF
+           ↓
+   OpportunityInput
+           ↓
+    AnalysisContext
+           ↓
+    EntityExtractor
+           ↓
+   ExtractedEntities
+           ↓
+ RuleBasedSignalEngine
+   ├── Upfront Payment Detection (registration fees, deposits)
+   ├── Urgency & Pressure Language (limited slots, act now)
+   ├── Guaranteed Selection Claims (100% placement)
+   ├── No Interview / Direct Hiring
+   ├── Unrealistic / Effortless Earnings
+   ├── Authority / Government Claims
+   ├── Informal Messaging Redirection (Telegram, WhatsApp)
+   ├── Personal UPI Destinations
+   ├── Unsolicited Selection Notices
+   └── Compound Multi-Risk Synthesis
+           ↓
+   List[RiskSignal] (with traceable Evidence)
+           ↓
+[FUTURE PART 8: RiskScoringEngine]
+```
+
+### Detected Signal Categories
+1. **Upfront Payment Demands (`SIG_UPFRONT_PAYMENT`)**: Identifies registration, processing, security, or training fees with contextual negation handling (e.g. "no fee required" is safely ignored).
+2. **Urgency & Coercion Language (`SIG_URGENCY_PRESSURE`)**: Detects high-pressure countdowns, artificial slot limits, and immediate payment commands while ignoring ordinary calendar deadlines.
+3. **Guaranteed Placement (`SIG_GUARANTEED_SELECTION`)**: Flags unrealistic promises of 100% hiring or placement without merit review.
+4. **No-Interview Direct Hiring (`SIG_NO_INTERVIEW`)**: Detects claims of instant appointment without screening.
+5. **No Experience Claims (`SIG_NO_EXPERIENCE`)**: Flags entry-level claims paired with outsized promises.
+6. **Unrealistic Earnings (`SIG_UNREALISTIC_EARNINGS`)**: Flags claims like "earn ₹1 lakh/week for 1 hour/day" while preserving legitimate corporate compensation structures.
+7. **Government Authority Claims (`SIG_AUTHORITY_CLAIM`)**: Flags unverified claims of government/ministry endorsement.
+8. **Informal Contact Redirection (`SIG_INFORMAL_CONTACT_CHANNEL`)**: Detects off-platform recruitment instructions funneling students into Telegram/WhatsApp.
+9. **Personal Payment Handles (`SIG_PERSONAL_PAYMENT_DESTINATION`)**: Flags payment requests routing funds to personal UPI VPAs.
+10. **Unsolicited Selection (`SIG_UNSOLICITED_SELECTION`)**: Flags notifications of selection for roles the recipient never applied for.
+11. **Document Issuance Claims (`SIG_DOCUMENT_CLAIM`)**: Flags claims of pre-attached appointment letters.
+12. **Compound Multi-Risk Patterns (`SIG_MULTIPLE_HIGH_RISK_PATTERNS`)**: Flags the simultaneous co-occurrence of upfront fees, urgency pressure, and guaranteed hiring.
+
+---
+
+## 9. File Safety & Privacy Principles
 
 1. **Strict MIME & Extension Whitelisting**:
    - Only permitted image and PDF types are accepted.
    - Executables (`.exe`, `.sh`, `.bat`, `.dll`, `.msi`) and scripts are strictly rejected with HTTP 422.
 2. **File Size Boundaries**:
    - Images capped at 10 MB.
-   - PDFs capped at 15 MB.
+   - PDFs capped at 15 MB and 100 pages maximum.
    - Text submissions capped at 100,000 characters.
-3. **Zero Permanent Storage (Privacy by Default)**:
-   - Uploaded opportunity documents frequently contain student PII (names, phone numbers, addresses, account IDs).
-   - ScamCheck processes inputs **ephemerally in memory**.
-   - No documents are saved to disk or persistent databases.
+3. **No Code Execution**:
+   - File contents and extracted text are treated strictly as passive data streams.
+   - Prompt injection attempts and URL command parameters are parsed strictly as literal data strings.
+4. **Ephemeral Processing & Zero Persistence**:
+   - Uploaded images, PDFs, and extracted text are processed 100% in-memory and are never stored in databases, log streams, or persistent disks.
+5. **Privacy by Default**:
+   - Full student opportunity text is never logged or leaked in error responses.
    - Full user submissions are not logged in plain text.
+
